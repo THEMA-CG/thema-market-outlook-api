@@ -15,6 +15,6 @@ Returns annual data for the specified combination of scenario, group, region and
 The parameters indicator, country and zones are optional.  
   
 The end of the script contains example code for using the class.  
-Remember to update username and password in the example code before running it. 
+Remember to update username and password in the example code before running it.  
 The script has some built in validation and error handling to simplify use of the API.  
 Technical documentation of the API can be found here: https://portal.thema.no/customer-api/swagger-ui/index.html

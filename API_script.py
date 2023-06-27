@@ -17,7 +17,7 @@ class Thema_API:
         self.password = password
 
         # specify all API URLs
-        self.api_root_url = "https://testportal.thema.data-fab2.net/customer-api/"
+        self.api_root_url = "https://portal.thema.no/customer-api/"
         self.authorization_url = f"{self.api_root_url}authenticate"
         self.masterdata_url = f"{self.api_root_url}masterdata"
         self.annualData_url = f"{self.api_root_url}annualData"

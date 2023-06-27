@@ -2,7 +2,7 @@ import requests
 import pandas as pd
 import time
 from datetime import datetime
-
+import itertools
 
 class Thema_API:
 
@@ -17,7 +17,7 @@ class Thema_API:
         self.password = password
 
         # specify all API URLs
-        self.api_root_url = "https://portal.thema.no/customer-api/"
+        self.api_root_url = "https://testportal.thema.data-fab2.net/customer-api/"
         self.authorization_url = f"{self.api_root_url}authenticate"
         self.masterdata_url = f"{self.api_root_url}masterdata"
         self.annualData_url = f"{self.api_root_url}annualData"
@@ -29,6 +29,10 @@ class Thema_API:
 
         # initiate master_data dict
         self.master_data = {}
+
+        # initiate flag for combination query and the rejected combinations dict
+        self.combination_query = False
+        self.rejected_combinations = {"Hourly": [], "Annual": []}
 
     def __get_authorization_token(self):
         """
@@ -95,6 +99,7 @@ class Thema_API:
         else:
             self.__handle_unexpected_errors(response, "Master data")
 
+
     def __unpack_masterdata_groups_response(self, response):
         """
         Private function for extracting and organising the 'groups' response into a df and puts it in the master data dict
@@ -135,7 +140,7 @@ class Thema_API:
             region = list_object['region']
 
             # create a list of duplicated region names equal to num of editions for region and zip together
-            region_list_to_df = zip([region] * len(list_object['edition']), list_object['edition'])
+            region_list_to_df = zip([region]*len(list_object['edition']), list_object['edition'])
 
             # create region df with zipped lists and append to list
             region_df = pd.DataFrame(region_list_to_df, columns=['region', 'edition'])
@@ -147,18 +152,19 @@ class Thema_API:
 
             # iterate over countries
             for country in region_countries:
+
                 # extract country name
                 country_name = country['country']
 
                 # create list of duplicated country names equal to num of zones in country and zip together
-                zones_list_to_df = zip([country_name] * len(country['zone']), country['zone'])
+                zones_list_to_df = zip([country_name]*len(country['zone']), country['zone'])
 
                 # create country df and add to list
                 country_df = pd.DataFrame(zones_list_to_df, columns=["country", 'zone'])
                 zones_list.append(country_df)
 
             # concat country dfs in region together, add region name and append to countries list
-            countries_df = pd.concat(zones_list)
+            countries_df = pd.concat(zones_list, ignore_index=True)
             countries_df.insert(0, 'region', region)
             countries_df_list.append(countries_df)
 
@@ -180,7 +186,7 @@ class Thema_API:
         # checks if given region is in regions df from master data API
         if region in list(self.master_data['editions']['region']):
             # create subset of editions df for given region
-            region_editions = self.master_data['editions'].loc[self.master_data['editions']['region'] == region].copy()
+            region_editions = self.master_data['editions'].loc[self.master_data['editions']['region']==region].copy()
 
             # add new data column with edition name transformed to datetime object. Sorts df based on this column
             region_editions["Date"] = list(map(self.__transfrom_to_date, list(region_editions['edition'])))
@@ -208,7 +214,32 @@ class Thema_API:
 
     def get_hourly_data(self, json):
         """
-        Func to call hourly data API
+        Public func to get hourly data.
+        :param json(dict): the user specified dict/json with input parameters to the API
+        :return df[df): the hourly data returned from the API
+        """
+
+        # checks if any json parameters have multiple values
+        if any(list(map(lambda x: type(x) == set, json.values()))):
+
+            # call func to create list of json combinations
+            jsons = self.__create_query_combinations(json)
+
+            try:
+                # call func to query API with all json combinations and concat to one df
+                df = pd.concat(list(map(self.__get_hourly_data, jsons)), ignore_index=True)
+            except:
+                print("No valid combinations for Hourly data")
+                raise SystemExit
+
+        else:
+            df = self.__get_hourly_data(json)
+
+        return df
+
+    def __get_hourly_data(self, json):
+        """
+        Private func to call hourly data API
         :param json(dict): the user specified dict/json with input parameters to the API
         :return df[df): the hourly data returned from the API
         """
@@ -231,7 +262,17 @@ class Thema_API:
         if response.status_code == 200:
             df = self.__extract_from_response(response, "data")
             if not df.empty:
+
+                # add json key as df header and populate with value
+                for key, value in json.items():
+                    if value:
+                        df[key] = value
                 return df
+
+            # append combination to dict if not valid
+            elif self.combination_query:
+                self.rejected_combinations["Hourly"].append(json)
+
             else:
                 print("API returned no data")
                 print("Make sure json file have values aligning with the information in master data")
@@ -243,7 +284,32 @@ class Thema_API:
 
     def get_annual_data(self, json):
         """
-        Func to call annual data API
+        Public func to get annual data.
+        :param json(dict): the user specified dict/json with input parameters to the API
+        :return df[df): the hourly data returned from the API
+        """
+
+        # checks if any json parameters have multiple values
+        if any(list(map(lambda x: type(x) == set, json.values()))):
+
+            # call func to create list of json combinations
+            jsons = self.__create_query_combinations(json)
+
+            try:
+                # call func to query API with all json combinations and concat to one df
+                df = pd.concat(list(map(self.__get_annual_data, jsons)), ignore_index=True)
+            except:
+                print("No valid combinations for Annual data")
+                raise SystemExit
+
+        else:
+            df = self.__get_annual_data(json)
+
+        return df
+
+    def __get_annual_data(self, json):
+        """
+        Private func to call annual data API
         :param json(dict): the user specified dict/json with input parameters to the API
         :return df[df): the annual data returned from the API
         """
@@ -266,7 +332,17 @@ class Thema_API:
         if response.status_code == 200:
             df = self.__extract_from_response(response, "data")
             if not df.empty:
+
+                # add json key as df header and populate with value
+                for key, value in json.items():
+                    if value:
+                        df[key] = value
                 return df
+
+            # append combination to dict if not valid
+            elif self.combination_query:
+                self.rejected_combinations["Annual"].append(json)
+
             else:
                 print("API returned no data")
                 print("Make sure json file have values aligning with the information in master data")
@@ -286,9 +362,64 @@ class Thema_API:
         try:
             return pd.json_normalize(response.json()[0][key])
         except:
-            print("API returned no data")
-            print("Make sure json file have values aligning with the information in master data and try again")
-            raise SystemExit
+
+            # different error handling if combinations query
+            if self.combination_query:
+                return pd.DataFrame()
+            else:
+                print("API returned no data")
+                print("Make sure json file have values aligning with the information in master data and try again")
+                raise SystemExit
+
+    def __create_query_combinations(self, json):
+        """
+        Func responsible for making all possible value combinations based on json input
+        :param json(dict): input json where one or more parameters have multiple values
+        :return: list of jsons with all possible json combinations
+        """
+
+        # sets combinations flag. Triggers different error handling
+        self.combination_query = True
+
+        # extract keys and values from input json
+        keys = json.keys()
+        values_list = json.values()
+
+        # transform all not iterable values to iterables
+        values_list = [{x} if not type(x)==set else x for x in values_list]
+
+        # construct all possible combinations
+        values_combinations = list(itertools.product(*values_list))
+
+        # zips combinations and json keys back to list of json combinations
+        jsons = list(map(lambda x: dict(zip(keys, x)), values_combinations))
+
+        return jsons
+
+    def get_rejected_combinations(self):
+        """
+        Func to create and return pandas df of rejected combinations
+        :return df(df): overview of all rejected combinations
+        """
+
+        # if any rejected combinations
+        if self.rejected_combinations["Hourly"] or self.rejected_combinations["Annual"]:  # if any rejected combinations
+            df_list = []
+
+            # creates df per query type
+            for query_type in self.rejected_combinations.keys():
+                if self.rejected_combinations[query_type]:
+                    df = pd.DataFrame(self.rejected_combinations[query_type])
+                    df.insert(0, "Query_type",  query_type)
+                    df_list.append(df)
+
+            # concat dfs and return
+            df = pd.concat(df_list, ignore_index=True)
+            return df
+
+        # if no rejected combinations, return empty df
+        else:
+            return pd.DataFrame
 
     def __handle_unexpected_errors(self, response, API_type):
         """
@@ -314,13 +445,13 @@ class Thema_API:
         missing_fields = [field for field in required_fields if field not in json.keys()]
 
         # if any fields missing, these are printed out to user and program is aborted
-        if not len(missing_fields) == 0:
+        if not len(missing_fields)==0:
             print("Aborting query")
             print(f"Missing required field(s) in json: {', '.join(missing_fields)}")
             raise SystemExit
         else:
             # generate a list of required fields where value is None or ""
-            missing_field_values = [field for field in required_fields if json[field] is None or json[field] == ""]
+            missing_field_values = [field for field in required_fields if json[field] is None or json[field]==""]
 
             # if any None or "" values for required fields, these are printed to user and program is aborted
             if not len(missing_field_values) == 0:
@@ -346,39 +477,42 @@ if __name__ == "__main__":
 
     # iterating over the different master data dfs
     for key, df in master_data.items():
-        # prints out the master data dfs
-        print(f"\n{key}")
-        print(df)
-
         # saves the master data dfs to excel
         df.to_excel(f"{output_folder}{key}.xlsx")
 
     # Hourly Data input example
-    # all values are mandatory, but program will set edition to the newest if not user specified
+    # all parameters are mandatory, but program will set edition to the newest if not user specified
+    # can specify multiple values per parameter by encapsulating in {}. Script will fetch all valid combinations
     json = {
-        "scenario": "Base",
-        "region": "Nordics",
-        "edition": None,
-        "country": "Norway",
-        "zone": "NO2"
-    }
+          "scenario": "Base",
+          "region": "Nordics",
+          "edition": None,
+          "country": {"Norway", "Sweden"},
+          "zone": {"NO2", "NO1", "SE2"}
+            }
 
     # example of calling the hourly data API and writing the results to excel
     hourly_data = API_object.get_hourly_data(json)
-    hourly_data.to_excel(f"{output_folder}Hourly_data.xlsx")
+    hourly_data.to_excel(f"{output_folder}Hourly_data.xlsx", index=False)
 
     # Annual Data input example
-    # indicator, country and zone are optional. Not specifying one or more of them will request all possible variations
+    # all parameters are mandatory, but program will set edition to the newest if not user specified
+    # can specify multiple values per parameter by encapsulating in {}. Script will fetch all valid combinations
     json = {
-        "scenario": "Base",
-        "group": "Real prices",
-        "indicator": "Gas price",
+        "scenario": {"Base", "Turbulent transition", "Technotopia"},
+        "group": {"Real prices", "Generation"},
+        "indicator": {"Gas price", "Coal price", "Nuclear"},
         "region": "Nordics",
         "edition": "September 2022",
-        "country": "Norway",
-        "zone": "NO2"
-    }
+        "country": {"Norway", "Sweden"},
+        "zone": {"NO1", "SE2"}
+            }
 
     # example of calling the annual data API and writing the results to excel
     annual_data = API_object.get_annual_data(json)
-    annual_data.to_excel(f"{output_folder}Annual_data.xlsx")
+    annual_data.to_excel(f"{output_folder}Annual_data.xlsx", index=False)
+
+    # if specifying multiple values per parameter, this gives overview of rejected values combinations
+    # non-rejected combinations are still included in Annual and Hourly output
+    rejected_combinations = API_object.get_rejected_combinations()
+    rejected_combinations.to_excel(f"{output_folder}Rejected_combinations.xlsx", index=False)

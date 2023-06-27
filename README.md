@@ -11,8 +11,7 @@ This is used as user input into the functions that fetches annual and hourly dat
 Returns hourly data for the specified combination of scenario, region, edition, country and zone.  
 
 3. get_annual_data()  
-Returns annual data for the specified combination of scenario, group, region and edition.  
-The parameters indicator, country and zones are optional.  
+Returns annual data for the specified combination of scenario, group, region, edition, indicator, country and zone.  
   
 The end of the script contains example code for using the class.  
 Remember to update username and password in the example code before running it.  

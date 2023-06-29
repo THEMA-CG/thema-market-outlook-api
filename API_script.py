@@ -223,7 +223,7 @@ class Thema_API:
         if any(list(map(lambda x: type(x) == set, json.values()))):
 
             # call func to create list of json combinations
-            jsons = self.__create_query_combinations(json)
+            jsons = self.__create_query_combinations(json, True)
 
             try:
                 # call func to query API with all json combinations and concat to one df
@@ -301,7 +301,6 @@ class Thema_API:
             except:
                 print("No valid combinations for Annual data")
                 raise SystemExit
-
         else:
             df = self.__get_annual_data(json)
 
@@ -371,10 +370,11 @@ class Thema_API:
                 print("Make sure json file have values aligning with the information in master data and try again")
                 raise SystemExit
 
-    def __create_query_combinations(self, json):
+    def __create_query_combinations(self, json, yearly=False):
         """
         Func responsible for making all possible value combinations based on json input
         :param json(dict): input json where one or more parameters have multiple values
+        :param yearly(bool): flag indicating if this is combinations for the yearly query
         :return: list of jsons with all possible json combinations
         """
 
@@ -393,6 +393,45 @@ class Thema_API:
 
         # zips combinations and json keys back to list of json combinations
         jsons = list(map(lambda x: dict(zip(keys, x)), values_combinations))
+
+        # calls func to sort out the most obvious invalid combinations
+        jsons = self.__sort_out_invalid_combinations(jsons, yearly)
+
+        return jsons
+
+    def __sort_out_invalid_combinations(self, jsons, yearly):
+        """
+        func to filter away invalid combinations
+        :param jsons: list of jsons with all possible json combinations
+        :param yearly(bool): flag indicating if this is combinations for the yearly query
+        :return: filtered jsons list
+        """
+        boolean_filter = []
+
+        if yearly:
+            # iterates over all jsons and add boolean value indicating if combinations is valid or not to boolean filter
+            for json in jsons:
+                if json["zone"] in (list((self.master_data["countries"].loc[(self.master_data["countries"]["region"] == json["region"]
+                    ) & (self.master_data["countries"]["country"] == json["country"]), "zone"]))):
+                    boolean_filter.append(True)
+                else:
+                    boolean_filter.append(False)
+
+            # removes non-valid combinations
+            jsons = [jsons[i] for i in range(len(jsons)) if boolean_filter[i]]
+
+        else:
+            # iterates over all jsons and add boolean value indicating if combinations is valid or not to boolean filter
+            for json in jsons:
+                if json["group"] in list(self.master_data["groups"].loc[self.master_data["groups"]["indicator"]==json["indicator"], "group"]) and \
+                        json["zone"] in list(self.master_data["countries"].loc[(self.master_data["countries"]["region"] == json["region"]
+                                        ) & (self.master_data["countries"]["country"] == json["country"]), "zone"]):
+                    boolean_filter.append(True)
+                else:
+                    boolean_filter.append(False)
+
+            # removes non-valid combinations
+            jsons = [jsons[i] for i in range(len(jsons)) if boolean_filter[i]]
 
         return jsons
 
@@ -505,7 +544,7 @@ if __name__ == "__main__":
         "region": "Nordics",
         "edition": "September 2022",
         "country": {"Norway", "Sweden"},
-        "zone": {"NO1", "SE2"}
+        "zone": {"NO1", "NO2", "SE1", "SE2"}
             }
 
     # example of calling the annual data API and writing the results to excel
@@ -515,4 +554,5 @@ if __name__ == "__main__":
     # if specifying multiple values per parameter, this gives overview of rejected values combinations
     # non-rejected combinations are still included in Annual and Hourly output
     rejected_combinations = API_object.get_rejected_combinations()
-    rejected_combinations.to_excel(f"{output_folder}Rejected_combinations.xlsx", index=False)
+    if not rejected_combinations.empty:
+        rejected_combinations.to_excel(f"{output_folder}Rejected_combinations.xlsx", index=False)

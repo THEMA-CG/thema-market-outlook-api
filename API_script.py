@@ -370,7 +370,7 @@ class Thema_API:
                 print("Make sure json file have values aligning with the information in master data and try again")
                 raise SystemExit
 
-    def __create_query_combinations(self, json, yearly=False):
+    def __create_query_combinations(self, json, hourly=False):
         """
         Func responsible for making all possible value combinations based on json input
         :param json(dict): input json where one or more parameters have multiple values
@@ -395,20 +395,20 @@ class Thema_API:
         jsons = list(map(lambda x: dict(zip(keys, x)), values_combinations))
 
         # calls func to sort out the most obvious invalid combinations
-        jsons = self.__sort_out_invalid_combinations(jsons, yearly)
+        jsons = self.__sort_out_invalid_combinations(jsons, hourly)
 
         return jsons
 
-    def __sort_out_invalid_combinations(self, jsons, yearly):
+    def __sort_out_invalid_combinations(self, jsons, hourly):
         """
         func to filter away invalid combinations
         :param jsons: list of jsons with all possible json combinations
-        :param yearly(bool): flag indicating if this is combinations for the yearly query
+        :param hourly(bool): flag indicating if this is combinations for the hourly query
         :return: filtered jsons list
         """
         boolean_filter = []
 
-        if yearly:
+        if hourly:
             # iterates over all jsons and add boolean value indicating if combinations is valid or not to boolean filter
             for json in jsons:
                 if json["zone"] in (list((self.master_data["countries"].loc[(self.master_data["countries"]["region"] == json["region"]

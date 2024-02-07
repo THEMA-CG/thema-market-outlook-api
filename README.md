@@ -8,7 +8,6 @@ The file has has three classes:
 
 # Thema_data_API
 A class to get market outlook data.
-Example code to interact with the script can be found in Market_outlook_data_example_code.py
 This class has three public functions:
 
 1. get_master_data()  
@@ -19,12 +18,14 @@ This is used as user input into the functions that fetches annual and hourly dat
 Returns hourly data for the specified combination of scenario, region, edition, country and zone.  
 
 3. get_annual_data()  
-Returns annual data for the specified combination of scenario, group, region, edition, indicator, country and zone.  
+Returns annual data for the specified combination of scenario, group, region, edition, indicator, country and zone.
+
+Example code to interact with the script can be found in Market_outlook_data_example_code.py
 
 
 # Thema_technology_data_API
 A class to get technology outlook data
-Example code to to interact with the script can be found in Technology_outlook_data_example_code.py. 
+
 This class has two public functions:
 
 1. get_master_data()  
@@ -34,10 +35,12 @@ This is used as user input into the functions that fetches annual data.
 2. get_annual_data()
 Returns annual data for the specified combination of scenario, country, edition, indicator, technology and category.
 
+Example code to to interact with the script can be found in Technology_outlook_data_example_code.py. 
+
 
 # Thema_hydrogen_data_API
 A class to get hydrogen outlook data
-Example code to to interact with the script can be found in Hydrogen_outlook_data_example_code.py.
+
 This class has two public functions:
 
 1. get_master_data()  
@@ -46,6 +49,8 @@ This is used as user input into the functions that fetches annual data.
 
 2. get_annual_data()
 Returns annual data for the specified combination of scenario, country, edition, group and indicator.
+
+Example code to to interact with the script can be found in Hydrogen_outlook_data_example_code.py.
 
 
 

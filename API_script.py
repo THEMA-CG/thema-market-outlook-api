@@ -141,7 +141,8 @@ class Thema_API:
         print(f"API response code: {response.status_code}")
         print(f"API response content: {response.json()}")
         raise SystemExit
-            
+
+
 class Thema_data_API(Thema_API):
 
     def __init__(self, username, password):
@@ -171,6 +172,7 @@ class Thema_data_API(Thema_API):
 
             # extracts the scenario information, transforms it to df and adds it to dict
             self.master_data["scenario"] = pd.DataFrame(response['scenario'])
+            self.master_data["scenario"].columns = ["scenario"]
 
             # calls functions to extracts and organize the other master data categories
             self.__unpack_masterdata_groups_response(response['groups'])
@@ -295,6 +297,25 @@ class Thema_data_API(Thema_API):
         # calls authorization token func
         self._get_authorization_token()
 
+        # if not master data is already fetched, master data API is called
+        if not bool(self.master_data):
+            self.get_master_data(with_return=False)        
+
+        if 'edition' not in json.keys() or not json['edition']:
+            json['edition'] = self.__get_newest_edition()
+
+        if "scenario" not in json.keys() or not json["scenario"]:
+            json["scenario"] = set(self.master_data["scenario"]["scenario"])
+
+        if "zone" not in json.keys() or not json["zone"]:
+            json["zone"] = set(self.master_data["countries"]["zone"])
+
+        if "country" not in json.keys() or not json["country"]:
+            json["country"] = set(self.master_data["countries"]["country"])
+
+        if "region" not in json.keys() or not json["region"]:
+            json["region"] = set(self.master_data["countries"]["region"])
+
         # checks if any json parameters have multiple values
         if any(list(map(lambda x: type(x) == set, json.values()))):
 
@@ -326,10 +347,6 @@ class Thema_data_API(Thema_API):
         # specify required fields in input, and calls func to validate required fields are present and have values
         required_fields = ["scenario", "region", "country", "zone"]
         self.__validate_json(json, required_fields)
-
-        # if edition value is missing, func to find the newest edition for given region is called
-        if 'edition' not in json.keys() or not json['edition']:
-            json['edition'] = self.__get_newest_edition(json['region'])
 
         # calls hourly data API
         response = requests.post(self.hourlyData_url, headers=self.authorization_header, json=json)
@@ -369,6 +386,31 @@ class Thema_data_API(Thema_API):
         # calls authorization token func
         self._get_authorization_token()
 
+        # if not master data is already fetched, master data API is called
+        if not bool(self.master_data):
+            self.get_master_data(with_return=False)
+
+        if 'edition' not in json.keys() or not json['edition']:
+            json['edition'] = self.__get_newest_edition()
+
+        if "scenario" not in json.keys() or not json["scenario"]:
+            json["scenario"] = set(self.master_data["scenario"]["scenario"])
+
+        if "zone" not in json.keys() or not json["zone"]:
+            json["zone"] = set(self.master_data["countries"]["zone"])
+
+        if "country" not in json.keys() or not json["country"]:
+            json["country"] = set(self.master_data["countries"]["country"])
+
+        if "region" not in json.keys() or not json["region"]:
+            json["region"] = set(self.master_data["countries"]["region"])
+
+        if "indicator" not in json.keys() or not json["indicator"]:
+            json["indicator"] = set(self.master_data["groups"]["indicator"])
+
+        if "group" not in json.keys() or not json["group"]:
+            json["group"] = set(self.master_data["groups"]["groups"])
+
         # checks if any json parameters have multiple values
         if any(list(map(lambda x: type(x) == set, json.values()))):
 
@@ -399,10 +441,6 @@ class Thema_data_API(Thema_API):
         # specify required fields in input, and calls func to validate required fields are present and have values
         required_fields = ["scenario", "region", "group"]
         self.__validate_json(json, required_fields)
-
-        # if edition value is missing, func to find the newest edition for given region is called
-        if 'edition' not in json.keys() or not json['edition']:
-            json['edition'] = self.__get_newest_edition(json['region'])
 
         # calls annual data API
         response = requests.post(self.annualData_url, headers=self.authorization_header, json=json)
@@ -517,7 +555,6 @@ class Thema_data_API(Thema_API):
                 print("Aborting query")
                 print(f"Missing values for required field(s) in json: {', '.join(missing_field_values)}")
                 raise SystemExit
-
 
 
 class Thema_technology_data_API(Thema_API):

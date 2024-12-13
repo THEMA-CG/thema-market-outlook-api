@@ -24,8 +24,8 @@ with pd.ExcelWriter(f"{output_folder}Master_data.xlsx", engine="xlsxwriter") as 
         df.to_excel(writer, sheet_name=str(name), index=False)
 
 # Hourly Data input example
-# all parameters are mandatory, but program will set edition to the newest if not user specified
 # can specify multiple values per parameter by encapsulating in {}. Script will fetch all valid combinations
+# parameters that are not specified, or given as None, will be filled with all valid inputs by program. Note that this might lead to high memory usage and long execution time
 json = {
         "scenario": "Base",
         "region": "Nordics",
@@ -39,8 +39,8 @@ hourly_data = API_object.get_hourly_data(json)
 hourly_data.to_excel(f"{output_folder}Hourly_data.xlsx", index=False)
 
 # Annual Data input example
-# all parameters are mandatory, but program will set edition to the newest if not user specified
 # can specify multiple values per parameter by encapsulating in {}. Script will fetch all valid combinations
+# parameters that are not specified, or given as None, will be filled with all valid inputs by program. Note that this might lead to high memory usage and long execution time
 json = {
     "scenario": {"Base", "Turbulent transition", "Technotopia"},
     "group": {"Real prices", "Generation"},

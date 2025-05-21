@@ -23,7 +23,7 @@ Returns annual data for the specified combination of scenario, group, region, ed
 4. get_monthly_data()
 Returns monthly data for the specified combination of scenario, group, region, edition, indicator, country and zone.
 
-5. get_go_data()
+5. get_GO_data()
 Returns Guarantees of Origin Outlook data for the specified combination of scenario, group, edition, indicator and zone.
 
 6. get_PPA_data()

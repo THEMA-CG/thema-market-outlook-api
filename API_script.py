@@ -14,6 +14,7 @@ class Thema_API:
         """
         Constructor initializing class variables
         :param username(str): Thema web portal username
+        :param password(str): Thema web portal password
         """
 
         self.username = username

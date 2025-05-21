@@ -8,7 +8,7 @@ The file has has three classes:
 
 # Thema_data_API
 A class to get market outlook data.
-This class has five public functions:
+This class has six public functions:
 
 1. get_master_data()  
 Returns the combinations of input parameters avaliable to individual users.  

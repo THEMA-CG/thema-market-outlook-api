@@ -8,7 +8,7 @@ The file has has three classes:
 
 # Thema_data_API
 A class to get market outlook data.
-This class has three public functions:
+This class has five public functions:
 
 1. get_master_data()  
 Returns the combinations of input parameters avaliable to individual users.  
@@ -19,6 +19,15 @@ Returns hourly data for the specified combination of scenario, region, edition, 
 
 3. get_annual_data()  
 Returns annual data for the specified combination of scenario, group, region, edition, indicator, country and zone.
+
+4. get_monthly_data()
+Returns monthly data for the specified combination of scenario, group, region, edition, indicator, country and zone.
+
+5. get_go_data()
+Returns Guarantees of Origin Outlook data for the specified combination of scenario, group, edition, indicator and zone.
+
+6. get_PPA_data()
+Returns Power Purchase Agreement data for the specified combination of scenario, group, edition and zone.
 
 Example code to interact with the script can be found in Market_outlook_data_example_code.py
 
@@ -51,8 +60,3 @@ This is used as user input into the functions that fetches annual data.
 Returns annual data for the specified combination of scenario, country, edition, group and indicator.
 
 Example code to to interact with the script can be found in Hydrogen_outlook_data_example_code.py.
-
-
-
-
-

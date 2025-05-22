@@ -5,7 +5,7 @@ import os
 from getpass import getpass
 
 # specify username and password
-username = "yourEmail@company.com"
+username = "post@thema.no"
 password = getpass()
 
 # specify a folder for the output
@@ -74,34 +74,6 @@ json = {
 #example of calling the monthly data API and writing the results to excel
 monthly_data = API_object.get_monthly_data(json)
 monthly_data.to_excel(f"{output_folder}Monthly_data.xlsx", index=False)
-
-# GO Data input example
-# can specify multiple values per parameter by encapsulating in {}. Script will fetch all valid combinations
-# parameters that are not specified, or given as None, will be filled with all valid inputs by program. 
-# Note that this might lead to high memory usage and long execution time
-json = {
-        "scenario": "Base",
-        "edition": None,
-        "zone": "Spain",
-        "group": "Supply",
-        "indicator": "Bio"
-}
-
-go_data = API_object.get_GO_data(json)
-go_data.to_excel(f"{output_folder}GO_data.xlsx", index=False)
-
-# PPA Data input example
-# can specify multiple values per parameter by encapsulating in {}. Script will fetch all valid combinations
-# parameters that are not specified, or given as None, will be filled with all valid inputs by program. 
-# Note that this might lead to high memory usage and long execution time
-json = {
-    "scenario": "Base",
-    "edition": "December 2024",
-    "zone": "Spain",
-    "group": "Solar"
-}
-PPA_data = API_object.get_PPA_data(json)
-PPA_data.to_excel(f"{output_folder}PPA_data.xlsx", index=False)
 
 # if specifying multiple values per parameter, this gives overview of rejected values combinations
 # non-rejected combinations are still included in Annual and Hourly output

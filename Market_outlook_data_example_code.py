@@ -5,7 +5,7 @@ import os
 from getpass import getpass
 
 # specify username and password
-username = "post@thema.no"
+username = "yourEmail@company.com"
 password = getpass()
 
 # specify a folder for the output

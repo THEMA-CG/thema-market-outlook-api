@@ -608,34 +608,7 @@ class Thema_data_API(Thema_API):
             # removes non-valid combinations
             jsons = [jsons[i] for i in range(len(jsons)) if boolean_filter[i]]
 
-        return jsons
-
-    def get_rejected_combinations(self):
-        #TODO: remove function
-        """
-        Func to create and return pandas df of rejected combinations
-        :return df(df): overview of all rejected combinations
-        """
-
-        # if any rejected combinations
-        if self.rejected_combinations["Hourly"] or self.rejected_combinations["Annual"]:  # if any rejected combinations
-            df_list = []
-
-            # creates df per query type
-            for query_type in self.rejected_combinations.keys():
-                if self.rejected_combinations[query_type]:
-                    df = pd.DataFrame(self.rejected_combinations[query_type])
-                    df.insert(0, "Query_type",  query_type)
-                    df_list.append(df)
-
-            # concat dfs and return
-            df = pd.concat(df_list, ignore_index=True)
-            return df
-
-        # if no rejected combinations, return empty df
-        else:
-            return pd.DataFrame
-    
+        return jsons    
 
     def __validate_json(self, json, required_fields):
         """

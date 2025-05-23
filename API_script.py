@@ -33,7 +33,11 @@ class Thema_API:
 
         # initiate flag for combination query and the rejected combinations dict
         self.combination_query = False
-        self.rejected_combinations = {"Hourly": [], "Annual": [], "Monthly": [], "GO": [], "PPA": []}
+        self.rejected_combinations = {"Hourly": [], 
+                                      "Annual": [], 
+                                      "Monthly": [], 
+                                      "GO": [], 
+                                      "PPA": []}
 
     def _get_authorization_token(self):
         """
@@ -635,6 +639,31 @@ class Thema_data_API(Thema_API):
                 print(f"Missing values for required field(s) in json: {', '.join(missing_field_values)}")
                 raise SystemExit
 
+    def get_rejected_combinations(self):
+        """
+        Func to create and return pandas df of rejected combinations
+        :return df(df): overview of all rejected combinations
+        """
+
+        # if any rejected combinations
+        if self.rejected_combinations["Hourly"] or self.rejected_combinations["Annual"] or self.rejected_combinations["Monthly"]:  # if any rejected combinations
+            df_list = []
+
+            # creates df per query type
+            for query_type in self.rejected_combinations.keys():
+                if self.rejected_combinations[query_type]:
+                    df = pd.DataFrame(self.rejected_combinations[query_type])
+                    df.insert(0, "Query_type",  query_type)
+                    df_list.append(df)
+
+            # concat dfs and return
+            df = pd.concat(df_list, ignore_index=True)
+            return df
+
+        # if no rejected combinations, return empty df
+        else:
+            return pd.DataFrame
+
 
 
 class Thema_PPA_data_API(Thema_API):
@@ -830,9 +859,35 @@ class Thema_PPA_data_API(Thema_API):
                 print(f"Missing values for required field(s) in json: {', '.join(missing_field_values)}")
                 raise SystemExit
 
+    def get_rejected_combinations(self):
+        """
+        Func to create and return pandas df of rejected combinations
+        :return df(df): overview of all rejected combinations
+        """
+
+        # if any rejected combinations
+        if self.rejected_combinations["PPA"]:  # if any rejected combinations
+            df_list = []
+
+            # creates df per query type
+            for query_type in self.rejected_combinations.keys():
+                if self.rejected_combinations[query_type]:
+                    df = pd.DataFrame(self.rejected_combinations[query_type])
+                    df.insert(0, "Query_type",  query_type)
+                    df_list.append(df)
+
+            # concat dfs and return
+            df = pd.concat(df_list, ignore_index=True)
+            return df
+
+        # if no rejected combinations, return empty df
+        else:
+            return pd.DataFrame
+
         
 
 class Thema_GO_data_API(Thema_API):
+    
     def __init__(self, username, password):
         Thema_API.__init__(self, username, password)
         self.masterdata_url = f"{self.api_root_url}go/masterdata"
@@ -1057,12 +1112,12 @@ class Thema_technology_data_API(Thema_API):
 
     def get_master_data(self, with_return=True):
         """
-    A function to fetch master-/metadata for the API.
-    Gives all the authorized combinations of input variables to other APIs.
+        A function to fetch master-/metadata for the API.
+        Gives all the authorized combinations of input variables to other APIs.
 
-    :param with_return(bool): specify if the result dict should be returned from the function
-    :return self.master_data(dict): dictionary with all master data for API
-    """
+        :param with_return(bool): specify if the result dict should be returned from the function
+        :return self.master_data(dict): dictionary with all master data for API
+        """
 
         # calls authorization func
         self._get_authorization_token()

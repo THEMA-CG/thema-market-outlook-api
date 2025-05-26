@@ -8,11 +8,11 @@ The file has has three classes:
 
 # Thema_data_API
 A class to get market outlook data.
-This class has six public functions:
+This class has four public functions:
 
 1. get_master_data()  
 Returns the combinations of input parameters avaliable to individual users.  
-This is used as user input into the functions that fetches annual and hourly data.  
+This is used as user input into the functions that fetches annual, monthly and hourly data.  
   
 2. get_hourly_data()  
 Returns hourly data for the specified combination of scenario, region, edition, country and zone.  
@@ -23,13 +23,33 @@ Returns annual data for the specified combination of scenario, group, region, ed
 4. get_monthly_data()
 Returns monthly data for the specified combination of scenario, group, region, edition, indicator, country and zone.
 
-5. get_GO_data()
+Example code to interact with the script can be found in Market_outlook_data_example_code.py
+
+
+# Thema_GO_data_API
+This class has two public functions
+
+1. get_master_data()  
+Returns the combinations of input parameters avaliable to individual users.  
+This is used as user input into the functions that fetches GO data.
+
+2. get_GO_data()
 Returns Guarantees of Origin Outlook data for the specified combination of scenario, group, edition, indicator and zone.
 
-6. get_PPA_data()
+Example code to to interact with the script can be found in GO_outlook_data_example_code.py.
+ 
+
+# Thema_PPA_data_API
+This class has two public functions
+
+1. get_master_data()  
+Returns the combinations of input parameters avaliable to individual users.  
+This is used as user input into the functions that fetches GO data.
+
+2. get_PPA_data()
 Returns Power Purchase Agreement data for the specified combination of scenario, group, edition and zone.
 
-Example code to interact with the script can be found in Market_outlook_data_example_code.py
+Example code to to interact with the script can be found in PPA_outlook_data_example_code.py. 
 
 
 # Thema_technology_data_API

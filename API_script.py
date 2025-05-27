@@ -154,8 +154,6 @@ class Thema_data_API(Thema_API):
         self.annualData_url = f"{self.api_root_url}annualData"
         self.hourlyData_url = f"{self.api_root_url}hourlyData"
         self.monthlyData_url = f"{self.api_root_url}monthlyData"
-        self.goData_url = f"{self.api_root_url}go/data"
-        self.PPAData_url = F"{self.api_root_url}ppa/data"
 
     def get_master_data(self, with_return=True):
         """

@@ -25,7 +25,8 @@ with pd.ExcelWriter(f"{output_folder}Master_data.xlsx", engine="xlsxwriter") as 
 
 # Hourly Data input example
 # can specify multiple values per parameter by encapsulating in {}. Script will fetch all valid combinations
-# parameters that are not specified, or given as None, will be filled with all valid inputs by program. Note that this might lead to high memory usage and long execution time
+# parameters that are not specified, or given as None, will be filled with all valid inputs by program. 
+# Note that this might lead to high memory usage and long execution time
 json = {
         "scenario": "Base",
         "region": "Nordics",
@@ -40,7 +41,8 @@ hourly_data.to_excel(f"{output_folder}Hourly_data.xlsx", index=False)
 
 # Annual Data input example
 # can specify multiple values per parameter by encapsulating in {}. Script will fetch all valid combinations
-# parameters that are not specified, or given as None, will be filled with all valid inputs by program. Note that this might lead to high memory usage and long execution time
+# parameters that are not specified, or given as None, will be filled with all valid inputs by program. 
+# Note that this might lead to high memory usage and long execution time
 json = {
     "scenario": {"Base", "Turbulent transition", "Technotopia"},
     "group": {"Real prices", "Generation"},
@@ -54,6 +56,24 @@ json = {
 # example of calling the annual data API and writing the results to excel
 annual_data = API_object.get_annual_data(json)
 annual_data.to_excel(f"{output_folder}Annual_data.xlsx", index=False)
+
+# Monthly Data input example
+# can specify multiple values per parameter by encapsulating in {}. Script will fetch all valid combinations
+# parameters that are not specified, or given as None, will be filled with all valid inputs by program. 
+# Note that this might lead to high memory usage and long execution time
+json = {
+    "scenario": "Base",
+    "group": "Real prices",
+    "indicator": "Base price",
+    "region": "Nordics",
+    "edition": None, 
+    "country": "Denmark",
+    "zone": "DK2"
+    }
+
+#example of calling the monthly data API and writing the results to excel
+monthly_data = API_object.get_monthly_data(json)
+monthly_data.to_excel(f"{output_folder}Monthly_data.xlsx", index=False)
 
 # if specifying multiple values per parameter, this gives overview of rejected values combinations
 # non-rejected combinations are still included in Annual and Hourly output

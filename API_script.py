@@ -33,9 +33,12 @@ class Thema_API:
 
         # initiate flag for combination query and the rejected combinations dict
         self.combination_query = False
-        self.rejected_combinations = {"Hourly": [], "Annual": []}
+        self.rejected_combinations = {"Hourly": [], 
+                                      "Annual": [], 
+                                      "Monthly": [], 
+                                      "GO": [], 
+                                      "PPA": []}
 
-    
     def _get_authorization_token(self):
         """
         private function to call the authorization API and get a token
@@ -106,20 +109,17 @@ class Thema_API:
         jsons = list(map(lambda x: dict(zip(keys, x)), values_combinations))
 
         return jsons
-        
+            
     def _extract_from_response(self, response, key):
-        """
-        Func to extract data from response object
-        :param response(response object): API response object
-        :param key(str): name of dict key where API data is located
-        :return df(df): a df with the extracted data
-        """
-
-        # wraps it in a try except in case API returns something unexpected
+        #Checks if respons.json() is list of dictionaries or dictionary, normalize accordingly then return a dataframe
         try:
-            return pd.json_normalize(response.json()[0][key])
+            if isinstance(response.json(), list):
+                return pd.json_normalize(response.json()[0][key])
+            elif isinstance(response.json(), dict):
+                return pd.json_normalize(response.json()[key])
+            else:
+                raise ValueError("Unexpected JSON structure")
         except:
-
             # different error handling if combinations query
             if self.combination_query:
                 return pd.DataFrame()
@@ -128,7 +128,6 @@ class Thema_API:
                 print("Make sure json file have values aligning with the information in master data and try again")
                 raise SystemExit
             
-    
     def _handle_unexpected_errors(self, response, API_type):
         """
         Func to give user standardized feedback when API returns something unexpected
@@ -139,9 +138,11 @@ class Thema_API:
         # prints out feedback to user and aborts the program
         print(f"An unexpected error happened when fetching {API_type} from API")
         print(f"API response code: {response.status_code}")
-        print(f"API response content: {response.json()}")
+        try:
+            print(f"API response content: {response.json()}")
+        except Exception:
+            print(f"API response content (non-JSON): {response.text}")
         raise SystemExit
-
 
 class Thema_data_API(Thema_API):
 
@@ -152,6 +153,7 @@ class Thema_data_API(Thema_API):
         self.masterdata_url = f"{self.api_root_url}masterdata"
         self.annualData_url = f"{self.api_root_url}annualData"
         self.hourlyData_url = f"{self.api_root_url}hourlyData"
+        self.monthlyData_url = f"{self.api_root_url}monthlyData"
 
     def get_master_data(self, with_return=True):
         """
@@ -258,34 +260,49 @@ class Thema_data_API(Thema_API):
         self.master_data['editions'] = pd.concat(region_df_list, ignore_index=True)
         self.master_data['countries'] = pd.concat(countries_df_list, ignore_index=True)
 
-    def __get_newest_edition(self, region):
+    def __get_newest_edition(self, region=None):
         """
         Private func to fetch the newest edition name for a given region
         :param region(str): name of region
         :return(str): the latest edition of given region
         """
-
+        
         # if not master data is already fetched, master data API is called
-        if not bool(self.master_data):
-            self.get_master_data(with_return=False)
+        if region is not None:
+            #If region is inside the function call
+            if not bool(self.master_data):
+                self.get_master_data(with_return=False)
 
-        # checks if given region is in regions df from master data API
-        if region in list(self.master_data['editions']['region']):
-            # create subset of editions df for given region
-            region_editions = self.master_data['editions'].loc[self.master_data['editions']['region']==region].copy()
+            # checks if given region is in regions df from master data API
+            if region in list(self.master_data['editions']['region']):
+                # create subset of editions df for given region
+                region_editions = self.master_data['editions'].loc[self.master_data['editions']['region']==region].copy()
 
-            # add new data column with edition name transformed to datetime object. Sorts df based on this column
-            region_editions["Date"] = list(map(self._transfrom_to_date, list(region_editions['edition'])))
-            region_editions = region_editions.sort_values(by="Date", ascending=False)
+                # add new data column with edition name transformed to datetime object. Sorts df based on this column
+                region_editions["Date"] = list(map(self._transfrom_to_date, list(region_editions['edition'])))
+                region_editions = region_editions.sort_values(by="Date", ascending=False)
+
+                # extract and return the first edition in the sorted df
+                return region_editions["edition"].iloc[0]
+
+            else:
+                print("Given region not in regions overview")
+                print("Please make sure given region is in region overview from master data API")
+                raise SystemExit
+        
+        else:
+            #if region is not defined, then find newest edition in all regions
+            if not bool(self.master_data):
+                self.get_master_data(with_return=False)
+
+            editions = self.master_data['editions'].copy()
+
+            editions["Date"] = list(map(self._transfrom_to_date, list(editions['edition'])))
+
+            editions = editions.sort_values(by="Date", ascending=False)
 
             # extract and return the first edition in the sorted df
-            return region_editions["edition"].iloc[0]
-
-        else:
-            print("Given region not in regions overview")
-            print("Please make sure given region is in region overview from master data API")
-            raise SystemExit
-
+            return editions["edition"].iloc[0]
 
     def get_hourly_data(self, json):
         """
@@ -302,7 +319,7 @@ class Thema_data_API(Thema_API):
             self.get_master_data(with_return=False)        
 
         if 'edition' not in json.keys() or not json['edition']:
-            json['edition'] = self.__get_newest_edition()
+            json['edition'] = self.__get_newest_edition(json["region"])
 
         if "scenario" not in json.keys() or not json["scenario"]:
             json["scenario"] = set(self.master_data["scenario"]["scenario"])
@@ -375,6 +392,98 @@ class Thema_data_API(Thema_API):
         else:
             self._handle_unexpected_errors(response, "Hourly data")
 
+    def get_monthly_data(self, json):
+        """
+        Public func to get monthly data.
+        :param json(dict): the user specified dict/json with input parameters to the API
+        :return df[df): the hourly data returned from the API
+        """
+
+        # calls authorization token func
+        self._get_authorization_token()
+
+        # if not master data is already fetched, master data API is called
+        if not bool(self.master_data):
+            self.get_master_data(with_return=False)
+
+        if 'edition' not in json.keys() or not json['edition']:
+            json['edition'] = self.__get_newest_edition(json["region"])
+
+        if "scenario" not in json.keys() or not json["scenario"]:
+            json["scenario"] = set(self.master_data["scenario"]["scenario"])
+
+        if "zone" not in json.keys() or not json["zone"]:
+            json["zone"] = set(self.master_data["countries"]["zone"])
+
+        if "country" not in json.keys() or not json["country"]:
+            json["country"] = set(self.master_data["countries"]["country"])
+
+        if "region" not in json.keys() or not json["region"]:
+            json["region"] = set(self.master_data["countries"]["region"])
+
+        if "indicator" not in json.keys() or not json["indicator"]:
+            json["indicator"] = set(self.master_data["groups"]["indicator"])
+
+        if "group" not in json.keys() or not json["group"]:
+            json["group"] = set(self.master_data["groups"]["group"])
+
+        # checks if any json parameters have multiple values
+        if any(list(map(lambda x: type(x) == set, json.values()))):
+
+            # call func to create list of json combinations
+            jsons = self._create_query_combinations(json)
+
+            # calls func to sort out the most obvious invalid combinations
+            jsons = self.__sort_out_invalid_combinations(jsons, hourly=False)
+
+            try:
+                # call func to query API with all json combinations and concat to one df
+                df = pd.concat(list(map(self.__get_monthly_data, jsons)), ignore_index=True)
+            except:
+                print("No valid combinations for Monthly data")
+                raise SystemExit
+        else:
+            df = self.__get_monthly_data(json)
+
+        return df   
+
+    def __get_monthly_data(self, json):
+        """
+        Private func to call monthly data API
+        :param json(dict): the user specified dict/json with input parameters to the API
+        :return response: the response object from the API
+        """        
+
+        # specify required fields in input, and calls func to validate required fields are present and have values
+        required_fields = ["scenario", "region", "group"]
+        self.__validate_json(json, required_fields)
+  
+        # calls annual data API
+        response = requests.post(self.monthlyData_url, headers=self.authorization_header, json=json)
+        
+        # if API call is successful, calls func to extract data and returns results df if df is not empty
+        if response.status_code == 200:
+            df = self._extract_from_response(response, "data")
+            if not df.empty:
+
+                # add json key as df header and populate with value
+                for key, value in json.items():
+                    if value:
+                        df[key] = value
+                return df
+
+            # append combination to dict if not valid
+            elif self.combination_query:
+                self.rejected_combinations["Monthly"].append(json)
+
+            else:
+                print("API returned no data")
+                print("Make sure json file have values aligning with the information in master data")
+                raise SystemExit
+
+        # if error, func to handle unexpected errors is called
+        else:
+            self._handle_unexpected_errors(response, "Monthly data")
 
     def get_annual_data(self, json):
         """
@@ -391,7 +500,7 @@ class Thema_data_API(Thema_API):
             self.get_master_data(with_return=False)
 
         if 'edition' not in json.keys() or not json['edition']:
-            json['edition'] = self.__get_newest_edition()
+            json['edition'] = self.__get_newest_edition(json["region"])
 
         if "scenario" not in json.keys() or not json["scenario"]:
             json["scenario"] = set(self.master_data["scenario"]["scenario"])
@@ -467,7 +576,6 @@ class Thema_data_API(Thema_API):
         else:
             self._handle_unexpected_errors(response, "Annual data")
 
-
     def __sort_out_invalid_combinations(self, jsons, hourly):
         """
         func to filter away invalid combinations
@@ -502,34 +610,7 @@ class Thema_data_API(Thema_API):
             # removes non-valid combinations
             jsons = [jsons[i] for i in range(len(jsons)) if boolean_filter[i]]
 
-        return jsons
-
-
-    def get_rejected_combinations(self):
-        """
-        Func to create and return pandas df of rejected combinations
-        :return df(df): overview of all rejected combinations
-        """
-
-        # if any rejected combinations
-        if self.rejected_combinations["Hourly"] or self.rejected_combinations["Annual"]:  # if any rejected combinations
-            df_list = []
-
-            # creates df per query type
-            for query_type in self.rejected_combinations.keys():
-                if self.rejected_combinations[query_type]:
-                    df = pd.DataFrame(self.rejected_combinations[query_type])
-                    df.insert(0, "Query_type",  query_type)
-                    df_list.append(df)
-
-            # concat dfs and return
-            df = pd.concat(df_list, ignore_index=True)
-            return df
-
-        # if no rejected combinations, return empty df
-        else:
-            return pd.DataFrame
-
+        return jsons    
 
     def __validate_json(self, json, required_fields):
         """
@@ -556,6 +637,467 @@ class Thema_data_API(Thema_API):
                 print(f"Missing values for required field(s) in json: {', '.join(missing_field_values)}")
                 raise SystemExit
 
+    def get_rejected_combinations(self):
+        """
+        Func to create and return pandas df of rejected combinations
+        :return df(df): overview of all rejected combinations
+        """
+
+        # if any rejected combinations
+        if self.rejected_combinations["Hourly"] or self.rejected_combinations["Annual"] or self.rejected_combinations["Monthly"]:  # if any rejected combinations
+            df_list = []
+
+            # creates df per query type
+            for query_type in self.rejected_combinations.keys():
+                if self.rejected_combinations[query_type]:
+                    df = pd.DataFrame(self.rejected_combinations[query_type])
+                    df.insert(0, "Query_type",  query_type)
+                    df_list.append(df)
+
+            # concat dfs and return
+            df = pd.concat(df_list, ignore_index=True)
+            return df
+
+        # if no rejected combinations, return empty df
+        else:
+            return pd.DataFrame
+
+
+
+class Thema_PPA_data_API(Thema_API):
+    def __init__(self, username, password):
+        Thema_API.__init__(self, username, password)
+        self.masterdata_url = f"{self.api_root_url}ppa/masterdata"
+        self.PPAData_url = f"{self.api_root_url}ppa/data"
+
+    def get_master_data(self, with_return=True):
+        """
+        A function to fetch master-/metadata for the API.
+        Gives all the authorized combinations of input variables to other APIs.
+
+        :param with_return(bool): specify if the result dict should be returned from the function
+        :return self.master_data(dict): dictionary with all master data for API
+        """
+
+        # calls authorization func
+        self._get_authorization_token()
+        #print(self.masterdata_url)
+        #print('https://portal.thema.no/customer-api/ppa/masterdata' )
+        #self.masterdata_url = 'https://portal.thema.no/customer-api/ppa/masterdata' 
+        response = requests.get(self.masterdata_url, headers=self.authorization_header)     
+
+        # checks if API call was successful
+        if response.status_code == 200:
+            response = response.json()            
+            
+            for key, value in response.items():
+
+                # extracts the scenario information, transforms it to df and adds it to dict
+                df = pd.DataFrame(value)
+                if len(df.columns) == 1:
+                    df.columns = [key]
+
+                self.master_data[key] = df.reset_index(drop=True)         
+
+            # returns data dict if specified
+            if with_return:
+                return self.master_data
+
+        # calls function to handle unexpected error
+        else:
+            self._handle_unexpected_errors(response, "Master data")
+
+    def get_PPA_data(self, json):
+        """
+        Public func to get PPA data.
+        :param json(dict): the user specified dict/json with input parameters to the API
+        :return df[df): the hourly data returned from the API
+        """
+
+        # calls authorization token func
+        self._get_authorization_token()
+
+        # if not master data is already fetched, master data API is called
+        if not bool(self.master_data):
+            self.get_master_data(with_return=False)
+
+        if 'edition' not in json.keys() or not json['edition']:
+            json['edition'] = self.__get_newest_edition()
+
+        if "scenario" not in json.keys() or not json["scenario"]:
+            json["scenario"] = set(self.master_data["scenario"]["scenario"])
+
+        if "zone" not in json.keys() or not json["zone"]:
+            json["zone"] = set(self.master_data["countries"]["zone"])
+
+        if "group" not in json.keys() or not json["group"]:
+            json["group"] = set(self.master_data["groups"]["group"])
+        
+        # checks if any json parameters have multiple values
+        if any(list(map(lambda x: type(x) == set, json.values()))):
+
+            # call func to create list of json combinations
+            jsons = self._create_query_combinations(json)
+
+            ## calls func to sort out the most obvious invalid combinations
+            #jsons = self.__sort_out_invalid_combinations(jsons, hourly=False)
+
+            try:
+                # call func to query API with all json combinations and concat to one df
+                df = pd.concat(list(map(self.__get_PPA_data, jsons)), ignore_index=True)
+            except:
+                print("No valid combinations for PPA data")
+                raise SystemExit
+        else:
+            df = self.__get_PPA_data(json)
+
+        return df
+
+    def __get_PPA_data(self, json):
+        """
+        Private func to call PPA data API
+        :param json(dict): the user specified dict/json with input parameters to the API
+        :return df[df): the PPA data returned from the API
+        """        
+        required_fields = ["scenario", "group"]
+        self.__validate_json(json, required_fields)
+
+        # calls PPA data API
+        response = requests.post(self.PPAData_url, headers=self.authorization_header, json=json)
+
+        # if API call is successful, calls func to extract data and returns results df
+        if response.status_code == 200:
+            df = self._extract_from_response(response, "data")
+            if not df.empty:
+
+                # add json key as df header and populate with value
+                for key, value in json.items():
+                    if value:
+                        df[key] = value
+                return df
+
+            # append combination to dict if not valid
+            elif self.combination_query:
+                self.rejected_combinations["PPA"].append(json)
+
+            else:
+                print("API returned no data")
+                print("Make sure json file have values aligning with the information in master data")
+                raise SystemExit
+        else:
+            self._handle_unexpected_errors(response, "PPA data")
+    
+    def __get_newest_edition(self, region=None):
+        """
+        Private func to fetch the newest edition name for a given region
+        :param region(str): name of region
+        :return(str): the latest edition of given region
+        """
+        
+        # if not master data is already fetched, master data API is called
+        if region is not None:
+            #If region is inside the function call
+            if not bool(self.master_data):
+                self.get_master_data(with_return=False)
+
+            # checks if given region is in regions df from master data API
+            if region in list(self.master_data['editions']['region']):
+                # create subset of editions df for given region
+                region_editions = self.master_data['editions'].loc[self.master_data['editions']['region']==region].copy()
+
+                # add new data column with edition name transformed to datetime object. Sorts df based on this column
+                region_editions["Date"] = list(map(self._transfrom_to_date, list(region_editions['edition'])))
+                region_editions = region_editions.sort_values(by="Date", ascending=False)
+
+                # extract and return the first edition in the sorted df
+                return region_editions["edition"].iloc[0]
+
+            else:
+                print("Given region not in regions overview")
+                print("Please make sure given region is in region overview from master data API")
+                raise SystemExit
+        
+        else:
+            #if region is not defined, then find newest edition in all regions
+            if not bool(self.master_data):
+                self.get_master_data(with_return=False)
+
+            editions = self.master_data['editions'].copy()
+
+            print(editions)
+            editions["Date"] = list(map(self._transfrom_to_date, list(editions['editions'])))
+
+            editions = editions.sort_values(by="Date", ascending=False)
+
+            # extract and return the first edition in the sorted df
+            return editions["editions"].iloc[0]
+    
+    def __validate_json(self, json, required_fields):
+        """
+        Func to do lightweight validation of user input to API calls
+        :param json(dict): user input to API call
+        :param required_fields(list): the required fields in the API input
+        """
+
+        # generate a list of required fields missing from the user json input
+        missing_fields = [field for field in required_fields if field not in json.keys()]
+
+        # if any fields missing, these are printed out to user and program is aborted
+        if not len(missing_fields)==0:
+            print("Aborting query")
+            print(f"Missing required field(s) in json: {', '.join(missing_fields)}")
+            raise SystemExit
+        else:
+            # generate a list of required fields where value is None or ""
+            missing_field_values = [field for field in required_fields if json[field] is None or json[field]==""]
+
+            # if any None or "" values for required fields, these are printed to user and program is aborted
+            if not len(missing_field_values) == 0:
+                print("Aborting query")
+                print(f"Missing values for required field(s) in json: {', '.join(missing_field_values)}")
+                raise SystemExit
+
+    def get_rejected_combinations(self):
+        """
+        Func to create and return pandas df of rejected combinations
+        :return df(df): overview of all rejected combinations
+        """
+
+        # if any rejected combinations
+        if self.rejected_combinations["PPA"]:  # if any rejected combinations
+            df_list = []
+
+            # creates df per query type
+            for query_type in self.rejected_combinations.keys():
+                if self.rejected_combinations[query_type]:
+                    df = pd.DataFrame(self.rejected_combinations[query_type])
+                    df.insert(0, "Query_type",  query_type)
+                    df_list.append(df)
+
+            # concat dfs and return
+            df = pd.concat(df_list, ignore_index=True)
+            return df
+
+        # if no rejected combinations, return empty df
+        else:
+            return pd.DataFrame
+
+        
+
+class Thema_GO_data_API(Thema_API):
+    
+    def __init__(self, username, password):
+        Thema_API.__init__(self, username, password)
+        self.masterdata_url = f"{self.api_root_url}go/masterdata"
+        self.goData_url = f"{self.api_root_url}go/data"
+
+    def get_master_data(self, with_return=True):
+        """
+        A function to fetch master-/metadata for the API.
+        Gives all the authorized combinations of input variables to other APIs.
+
+        :param with_return(bool): specify if the result dict should be returned from the function
+        :return self.master_data(dict): dictionary with all master data for API
+        """
+
+        # calls authorization func
+        self._get_authorization_token()
+        response = requests.get(self.masterdata_url, headers=self.authorization_header)        
+
+        # checks if API call was successful
+        if response.status_code == 200:
+            response = response.json()            
+            
+            for key, value in response.items():
+
+                # extracts the scenario information, transforms it to df and adds it to dict
+                df = pd.DataFrame(value)
+                if len(df.columns) == 1:
+                    df.columns = [key]
+
+                self.master_data[key] = df.reset_index(drop=True)         
+
+            # returns data dict if specified
+            if with_return:
+                return self.master_data
+
+        # calls function to handle unexpected error
+        else:
+            self._handle_unexpected_errors(response, "Master data")
+
+    def get_GO_data(self, json):
+        """
+        Public func to get GO data.
+        :param json(dict): the user specified dict/json with input parameters to the API
+        :return df[df): the GO data returned from the API
+        """
+
+        # calls authorization token func and master data func
+        self._get_authorization_token() 
+
+        # if not master data is already fetched, master data API is called
+        if not bool(self.master_data):
+            self.get_master_data(with_return=False)
+
+        # if edition value is missing, func to find the newest edition for given region is called
+        if 'edition' not in json.keys() or not json['edition']:
+            json['edition'] = self.__get_newest_edition()
+
+        if "scenario" not in json.keys() or not json["scenario"]:
+            json["scenario"] = set(self.master_data["scenarios"]["scenarios"])
+
+        if "zone" not in json.keys() or not json["zone"]:
+            json["zone"] = set(self.master_data["countries"]["zone"])
+
+        if "group" not in json.keys() or not json["group"]:
+            json["group"] = set(self.master_data["groups"]["groups"])
+
+        if "indicator" not in json.keys() or not json["indicator"]:
+            json["indicator"] = set(self.master_data["groups"]["indicator"])
+
+        # checks if any json parameters have multiple values
+        if any(list(map(lambda x: type(x) == set, json.values()))):
+
+            # call func to create list of json combinations
+            jsons = self._create_query_combinations(json)
+
+            # calls func to sort out the most obvious invalid combinations
+            jsons = self.__sort_out_invalid_combinations(jsons)
+
+            try:
+                # call func to query API with all json combinations and concat to one df
+                df = pd.concat(list(map(self.__get_GO_data, jsons)), ignore_index=True)
+            except:
+                print("No valid combinations for GO data")
+                raise SystemExit
+        else:
+            df = self.__get_GO_data(json)
+
+        return df
+
+    def __get_GO_data(self, json):
+        """
+        Private func to call GO data API
+        :param json(dict): the user specified dict/json with input parameters to the API
+        :return df[df): the GO data returned from the API
+        """    
+
+        required_fields = ["scenario", "group"]
+        self.__validate_json(json, required_fields)   
+
+        response = requests.post(self.goData_url, headers=self.authorization_header, json=json)
+
+        # if API call is successful, calls func to extract data and returns results df
+        if response.status_code == 200:
+            df = self._extract_from_response(response, 'data')
+            if not df.empty:
+
+                # add json key as df header and populate with value
+                for key, value in json.items():
+                    if value:
+                        df[key] = value
+                return df
+
+            # append combination to dict if not valid
+            elif self.combination_query:
+                self.rejected_combinations["GO"].append(json)
+
+            else:
+                print("API returned no data")
+                print("Make sure json file have values aligning with the information in master data")
+                raise SystemExit
+        else:
+            self._handle_unexpected_errors(response, "GO data")
+
+    def __validate_json(self, json, required_fields):
+        """
+        Func to do lightweight validation of user input to API calls
+        :param json(dict): user input to API call
+        :param required_fields(list): the required fields in the API input
+        """
+
+        # generate a list of required fields missing from the user json input
+        missing_fields = [field for field in required_fields if field not in json.keys()]
+
+        # if any fields missing, these are printed out to user and program is aborted
+        if not len(missing_fields)==0:
+            print("Aborting query")
+            print(f"Missing required field(s) in json: {', '.join(missing_fields)}")
+            raise SystemExit
+        else:
+            # generate a list of required fields where value is None or ""
+            missing_field_values = [field for field in required_fields if json[field] is None or json[field]==""]
+
+            # if any None or "" values for required fields, these are printed to user and program is aborted
+            if not len(missing_field_values) == 0:
+                print("Aborting query")
+                print(f"Missing values for required field(s) in json: {', '.join(missing_field_values)}")
+                raise SystemExit
+            
+    def __get_newest_edition(self, region=None):
+        """
+        Private func to fetch the newest edition name for a given region
+        :param region(str): name of region
+        :return(str): the latest edition of given region
+        """
+        
+        # if not master data is already fetched, master data API is called
+        if region is not None:
+            #If region is inside the function call
+            if not bool(self.master_data):
+                self.get_master_data(with_return=False)
+
+            # checks if given region is in regions df from master data API
+            if region in list(self.master_data['editions']['region']):
+                # create subset of editions df for given region
+                region_editions = self.master_data['editions'].loc[self.master_data['editions']['region']==region].copy()
+
+                # add new data column with edition name transformed to datetime object. Sorts df based on this column
+                region_editions["Date"] = list(map(self._transfrom_to_date, list(region_editions['edition'])))
+                region_editions = region_editions.sort_values(by="Date", ascending=False)
+
+                # extract and return the first edition in the sorted df
+                return region_editions["edition"].iloc[0]
+
+            else:
+                print("Given region not in regions overview")
+                print("Please make sure given region is in region overview from master data API")
+                raise SystemExit
+        
+        else:
+            #if region is not defined, then find newest edition in all regions
+            if not bool(self.master_data):
+                self.get_master_data(with_return=False)
+
+            editions = self.master_data['editions'].copy()
+
+            editions["Date"] = list(map(self._transfrom_to_date, list(editions['editions'])))
+
+            editions = editions.sort_values(by="Date", ascending=False)
+
+            # extract and return the first edition in the sorted df
+            return editions["editions"].iloc[0]
+        
+    def __sort_out_invalid_combinations(self, jsons):
+        """
+        func to filter away invalid combinations
+        :param jsons: list of jsons with all possible json combinations
+        :param hourly(bool): flag indicating if this is combinations for the hourly query
+        :return: filtered jsons list
+        """
+        boolean_filter = []
+
+        # iterates over all jsons and add boolean value indicating if combinations is valid or not to boolean filter
+        for json in jsons:
+            if json["group"] in list(self.master_data["indicatorDetails"].loc[self.master_data["indicatorDetails"]["indicator"]==json["indicator"], "group"]):
+                boolean_filter.append(True)
+            else:
+                boolean_filter.append(False)
+
+        # removes non-valid combinations
+        jsons = [jsons[i] for i in range(len(jsons)) if boolean_filter[i]]
+
+        return jsons
 
 class Thema_technology_data_API(Thema_API):
 
@@ -568,12 +1110,12 @@ class Thema_technology_data_API(Thema_API):
 
     def get_master_data(self, with_return=True):
         """
-    A function to fetch master-/metadata for the API.
-    Gives all the authorized combinations of input variables to other APIs.
+        A function to fetch master-/metadata for the API.
+        Gives all the authorized combinations of input variables to other APIs.
 
-    :param with_return(bool): specify if the result dict should be returned from the function
-    :return self.master_data(dict): dictionary with all master data for API
-    """
+        :param with_return(bool): specify if the result dict should be returned from the function
+        :return self.master_data(dict): dictionary with all master data for API
+        """
 
         # calls authorization func
         self._get_authorization_token()
@@ -605,7 +1147,7 @@ class Thema_technology_data_API(Thema_API):
         """
         Public func to get annual data.
         :param json(dict): the user specified dict/json with input parameters to the API
-        :return df[df): the hourly data returned from the API
+        :return df[df): the annual data returned from the API
         """
 
         # calls authorization token func and master data func
@@ -713,7 +1255,6 @@ class Thema_technology_data_API(Thema_API):
         Private func to fetch the newest edition name
         :return(str): the latest edition
         """
-
         # if not master data is already fetched, master data API is called
         if not bool(self.master_data):
             self.get_master_data(with_return=False)
@@ -892,8 +1433,6 @@ class Thema_hydrogen_data_API(Thema_API):
         Private func to fetch the newest edition name
         :return(str): the latest edition
         """
-
-        # if not master data is already fetched, master data API is called
         if not bool(self.master_data):
             self.get_master_data(with_return=False)
 

@@ -64,12 +64,12 @@ annual_data.to_excel(f"{output_folder}Annual_data.xlsx", index=False)
 json = {
     "scenario": {"Base", "Turbulent Transition", "Green Growth"},
     "group": "Real prices",
-    "indicator": "Base price",
+    "indicator": "Base Price",
     "region": "Nordics",
     "edition": None, 
     "country": "Denmark",
     "zone": "DK2"
-    }
+}
 
 #example of calling the monthly data API and writing the results to excel
 monthly_data = API_object.get_monthly_data(json)

@@ -44,11 +44,11 @@ hourly_data.to_excel(f"{output_folder}Hourly_data.xlsx", index=False)
 # parameters that are not specified, or given as None, will be filled with all valid inputs by program. 
 # Note that this might lead to high memory usage and long execution time
 json = {
-    "scenario": {"Base", "Turbulent transition", "Green Growth"},
+    "scenario": {"Base", "Turbulent Transition", "Green Growth"},
     "group": {"Real prices", "Generation"},
     "indicator": {"Gas price", "Coal price", "Nuclear"},
     "region": "Nordics",
-    "edition": "September 2022",
+    "edition": "September 2025",
     "country": {"Norway", "Sweden"},
     "zone": {"NO1", "NO2", "SE1", "SE2", "SE3", "SE4"}
         }

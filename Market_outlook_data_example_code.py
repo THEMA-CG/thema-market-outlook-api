@@ -62,7 +62,7 @@ annual_data.to_excel(f"{output_folder}Annual_data.xlsx", index=False)
 # parameters that are not specified, or given as None, will be filled with all valid inputs by program. 
 # Note that this might lead to high memory usage and long execution time
 json = {
-    "scenario": "Base",
+    "scenario": {"Base", "Turbulent Transition", "Green Growth"},
     "group": "Real prices",
     "indicator": "Base price",
     "region": "Nordics",
